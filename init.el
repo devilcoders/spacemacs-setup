@@ -31,6 +31,8 @@ This function should only modify configuration layer settings."
    dotspacemacs-configuration-layers
    '(ruby
      yaml
+     html
+     typescript
      (javascript :variables js2-mode-show-parse-errors nil js2-mode-show-strict-warnings nil)
      ;; ----------------------------------------------------------------
      ;; Example of useful layers you may want to use right away.
@@ -42,8 +44,9 @@ This function should only modify configuration layer settings."
      better-defaults
      emacs-lisp
      git
+     github
      markdown
-     ;; org
+     org
      ;; (shell :variables
      ;;        shell-default-height 30
      ;;        shell-default-position 'bottom)
@@ -51,13 +54,22 @@ This function should only modify configuration layer settings."
      syntax-checking
      version-control
      react
+     elm
+     haskell
+     purescript
+     rust
+     go
+     shell-scripts
+     ;; semantic-web
+     nginx
+     shell
+     dash
      )
    ;; List of additional packages that will be installed without being
    ;; wrapped in a layer. If you need some configuration for these
    ;; packages, then consider creating a layer. You can also put the
    ;; configuration in `dotspacemacs/user-config'.
-   dotspacemacs-additional-packages '(
-                                      eslintd-fix)
+   dotspacemacs-additional-packages '(rjsx-mode)
    ;; A list of packages that cannot be updated.
    dotspacemacs-frozen-packages '()
    ;; A list of packages that will not be installed and loaded.
@@ -129,18 +141,17 @@ It should only modify the values of Spacemacs settings."
    ;; Press `SPC T n' to cycle to the next theme in the list (works great
    ;; with 2 themes variants, one dark and one light)
    dotspacemacs-themes '(nord
-                         dracula
-                         spacemacs-light
-                         spacemacs-dark)
+                         spacemacs-dark
+                         dracula)
    ;; If non-nil the cursor color matches the state color in GUI Emacs.
    dotspacemacs-colorize-cursor-according-to-state t
    ;; Default font, or prioritized list of fonts. `powerline-scale' allows to
    ;; quickly tweak the mode-line size to make separators look not too crappy.
    dotspacemacs-default-font '("Fira Code"
-                               :size 15
+                               :size 16
                                :weight normal
                                :width normal
-                               :powerline-scale 1.6)
+                               :powerline-scale 1.5)
    ;; The leader key
    dotspacemacs-leader-key "SPC"
    ;; The key used for Emacs commands `M-x' (after pressing on the leader key).
@@ -358,52 +369,153 @@ before packages are loaded."
    js2-strict-semi-warning nil
    js2-missing-semi-one-line-override nil
 
-   flycheck-javascript-eslint-executable "/usr/local/bin/eslint_d"
    flycheck-disabled-checkers '(scss jshint scss-lint scss-sass-lint)
 
    powerline-default-separator nil
 
-   web-mode-enable-current-element-highlight t
-   web-mode-enable-current-column-highlight t
    web-mode-markup-indent-offset 2
    web-mode-css-indent-offset 2
    web-mode-code-indent-offset 2
-   web-mode-indent-style 2)
+   web-mode-indent-style 2
+   )
 
-  (add-hook 'js2-mode-hook 'eslintd-fix-mode)
+  (add-to-list 'magic-mode-alist '("import\s+[^\s]+\s+from\s+['\"]prop-types['\"]" . react-mode))
 
-  ;; Make Fira Code ligarures work
-  (when (window-system)
-    (set-default-font "Fira Code"))
-  (let ((alist '((33 . ".\\(?:\\(?:==\\|!!\\)\\|[!=]\\)")
-               (35 . ".\\(?:###\\|##\\|_(\\|[#(?[_{]\\)")
-               (36 . ".\\(?:>\\)")
-               (37 . ".\\(?:\\(?:%%\\)\\|%\\)")
-               (38 . ".\\(?:\\(?:&&\\)\\|&\\)")
-               (42 . ".\\(?:\\(?:\\*\\*/\\)\\|\\(?:\\*[*/]\\)\\|[*/>]\\)")
-               (43 . ".\\(?:\\(?:\\+\\+\\)\\|[+>]\\)")
-               (45 . ".\\(?:\\(?:-[>-]\\|<<\\|>>\\)\\|[<>}~-]\\)")
-               (46 . ".\\(?:\\(?:\\.[.<]\\)\\|[.=-]\\)")
-               (47 . ".\\(?:\\(?:\\*\\*\\|//\\|==\\)\\|[*/=>]\\)")
-               (48 . ".\\(?:x[a-zA-Z]\\)")
-               (58 . ".\\(?:::\\|[:=]\\)")
-               (59 . ".\\(?:;;\\|;\\)")
-               (60 . ".\\(?:\\(?:!--\\)\\|\\(?:~~\\|->\\|\\$>\\|\\*>\\|\\+>\\|--\\|<[<=-]\\|=[<=>]\\||>\\)\\|[*$+~/<=>|-]\\)")
-               (61 . ".\\(?:\\(?:/=\\|:=\\|<<\\|=[=>]\\|>>\\)\\|[<=>~]\\)")
-               (62 . ".\\(?:\\(?:=>\\|>[=>-]\\)\\|[=>-]\\)")
-               (63 . ".\\(?:\\(\\?\\?\\)\\|[:=?]\\)")
-               (91 . ".\\(?:]\\)")
-               (92 . ".\\(?:\\(?:\\\\\\\\\\)\\|\\\\\\)")
-               (94 . ".\\(?:=\\)")
-               (119 . ".\\(?:ww\\)")
-               (123 . ".\\(?:-\\)")
-               (124 . ".\\(?:\\(?:|[=|]\\)\\|[=>|]\\)")
-               (126 . ".\\(?:~>\\|~~\\|[>=@~-]\\)")
-               )
-             ))
-  (dolist (char-regexp alist)
-    (set-char-table-range composition-function-table (car char-regexp)
-                          `([,(cdr char-regexp) 0 font-shape-gstring]))))
+  (when (memq window-system '(mac ns))
+    (exec-path-from-shell-initialize))
+
+   ;;; Fira code
+   ;; This works when using emacs --daemon + emacsclient
+    (add-hook 'after-make-frame-functions (lambda (frame) (set-fontset-font t '(#Xe100 . #Xe16f) "Fira Code Symbol")))
+    ;; This works when using emacs without server/client
+    (set-fontset-font t '(#Xe100 . #Xe16f) "Fira Code Symbol")
+    ;; I haven't found one statement that makes both of the above situations work, so I use both for now
+
+    (defconst fira-code-font-lock-keywords-alist
+      (mapcar (lambda (regex-char-pair)
+                `(,(car regex-char-pair)
+                  (0 (prog1 ()
+                      (compose-region (match-beginning 1)
+                                      (match-end 1)
+                                      ;; The first argument to concat is a string containing a literal tab
+                                      ,(concat "	" (list (decode-char 'ucs (cadr regex-char-pair)))))))))
+              '(("\\(www\\)"                   #Xe100)
+                ("[^/]\\(\\*\\*\\)[^/]"        #Xe101)
+                ("\\(\\*\\*\\*\\)"             #Xe102)
+                ("\\(\\*\\*/\\)"               #Xe103)
+                ("\\(\\*>\\)"                  #Xe104)
+                ("[^*]\\(\\*/\\)"              #Xe105)
+                ("\\(\\\\\\\\\\)"              #Xe106)
+                ("\\(\\\\\\\\\\\\\\)"          #Xe107)
+                ("\\({-\\)"                    #Xe108)
+                ("\\(\\[\\]\\)"                #Xe109)
+                ("\\(::\\)"                    #Xe10a)
+                ("\\(:::\\)"                   #Xe10b)
+                ("[^=]\\(:=\\)"                #Xe10c)
+                ("\\(!!\\)"                    #Xe10d)
+                ("\\(!=\\)"                    #Xe10e)
+                ("\\(!==\\)"                   #Xe10f)
+                ("\\(-}\\)"                    #Xe110)
+                ("\\(--\\)"                    #Xe111)
+                ("\\(---\\)"                   #Xe112)
+                ("\\(-->\\)"                   #Xe113)
+                ("[^-]\\(->\\)"                #Xe114)
+                ("\\(->>\\)"                   #Xe115)
+                ("\\(-<\\)"                    #Xe116)
+                ("\\(-<<\\)"                   #Xe117)
+                ("\\(-~\\)"                    #Xe118)
+                ("\\(#{\\)"                    #Xe119)
+                ("\\(#\\[\\)"                  #Xe11a)
+                ("\\(##\\)"                    #Xe11b)
+                ("\\(###\\)"                   #Xe11c)
+                ("\\(####\\)"                  #Xe11d)
+                ("\\(#(\\)"                    #Xe11e)
+                ("\\(#\\?\\)"                  #Xe11f)
+                ("\\(#_\\)"                    #Xe120)
+                ("\\(#_(\\)"                   #Xe121)
+                ("\\(\\.-\\)"                  #Xe122)
+                ("\\(\\.=\\)"                  #Xe123)
+                ("\\(\\.\\.\\)"                #Xe124)
+                ("\\(\\.\\.<\\)"               #Xe125)
+                ("\\(\\.\\.\\.\\)"             #Xe126)
+                ("\\(\\?=\\)"                  #Xe127)
+                ("\\(\\?\\?\\)"                #Xe128)
+                ("\\(;;\\)"                    #Xe129)
+                ("\\(/\\*\\)"                  #Xe12a)
+                ("\\(/\\*\\*\\)"               #Xe12b)
+                ("\\(/=\\)"                    #Xe12c)
+                ("\\(/==\\)"                   #Xe12d)
+                ("\\(/>\\)"                    #Xe12e)
+                ("\\(//\\)"                    #Xe12f)
+                ("\\(///\\)"                   #Xe130)
+                ("\\(&&\\)"                    #Xe131)
+                ("\\(||\\)"                    #Xe132)
+                ("\\(||=\\)"                   #Xe133)
+                ("[^|]\\(|=\\)"                #Xe134)
+                ("\\(|>\\)"                    #Xe135)
+                ("\\(\\^=\\)"                  #Xe136)
+                ("\\(\\$>\\)"                  #Xe137)
+                ("\\(\\+\\+\\)"                #Xe138)
+                ("\\(\\+\\+\\+\\)"             #Xe139)
+                ("\\(\\+>\\)"                  #Xe13a)
+                ("\\(=:=\\)"                   #Xe13b)
+                ("[^!/]\\(==\\)[^>]"           #Xe13c)
+                ("\\(===\\)"                   #Xe13d)
+                ("\\(==>\\)"                   #Xe13e)
+                ("[^=]\\(=>\\)"                #Xe13f)
+                ("\\(=>>\\)"                   #Xe140)
+                ("\\(<=\\)"                    #Xe141)
+                ("\\(=<<\\)"                   #Xe142)
+                ("\\(=/=\\)"                   #Xe143)
+                ("\\(>-\\)"                    #Xe144)
+                ("\\(>=\\)"                    #Xe145)
+                ("\\(>=>\\)"                   #Xe146)
+                ("[^-=]\\(>>\\)"               #Xe147)
+                ("\\(>>-\\)"                   #Xe148)
+                ("\\(>>=\\)"                   #Xe149)
+                ("\\(>>>\\)"                   #Xe14a)
+                ("\\(<\\*\\)"                  #Xe14b)
+                ("\\(<\\*>\\)"                 #Xe14c)
+                ("\\(<|\\)"                    #Xe14d)
+                ("\\(<|>\\)"                   #Xe14e)
+                ("\\(<\\$\\)"                  #Xe14f)
+                ("\\(<\\$>\\)"                 #Xe150)
+                ("\\(<!--\\)"                  #Xe151)
+                ("\\(<-\\)"                    #Xe152)
+                ("\\(<--\\)"                   #Xe153)
+                ("\\(<->\\)"                   #Xe154)
+                ("\\(<\\+\\)"                  #Xe155)
+                ("\\(<\\+>\\)"                 #Xe156)
+                ("\\(<=\\)"                    #Xe157)
+                ("\\(<==\\)"                   #Xe158)
+                ("\\(<=>\\)"                   #Xe159)
+                ("\\(<=<\\)"                   #Xe15a)
+                ("\\(<>\\)"                    #Xe15b)
+                ("[^-=]\\(<<\\)"               #Xe15c)
+                ("\\(<<-\\)"                   #Xe15d)
+                ("\\(<<=\\)"                   #Xe15e)
+                ("\\(<<<\\)"                   #Xe15f)
+                ("\\(<~\\)"                    #Xe160)
+                ("\\(<~~\\)"                   #Xe161)
+                ("\\(</\\)"                    #Xe162)
+                ("\\(</>\\)"                   #Xe163)
+                ("\\(~@\\)"                    #Xe164)
+                ("\\(~-\\)"                    #Xe165)
+                ("\\(~=\\)"                    #Xe166)
+                ("\\(~>\\)"                    #Xe167)
+                ("[^<]\\(~~\\)"                #Xe168)
+                ("\\(~~>\\)"                   #Xe169)
+                ("\\(%%\\)"                    #Xe16a)
+              ;; ("\\(x\\)"                   #Xe16b) This ended up being hard to do properly so i'm leaving it out.
+                ("[^:=]\\(:\\)[^:=]"           #Xe16c)
+                ("[^\\+<>]\\(\\+\\)[^\\+<>]"   #Xe16d)
+                ("[^\\*/<>]\\(\\*\\)[^\\*/<>]" #Xe16f))))
+
+    (defun add-fira-code-symbol-keywords ()
+      (font-lock-add-keywords nil fira-code-font-lock-keywords-alist))
+
+    (add-hook 'prog-mode-hook
+              #'add-fira-code-symbol-keywords)
   )
 
 ;; Do not write anything past this comment. This is where Emacs will
@@ -418,10 +530,12 @@ This function is called at the very end of Spacemacs initialization."
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(ansi-color-names-vector
+   ["#0a0814" "#f2241f" "#67b11d" "#b1951d" "#4f97d7" "#a31db1" "#28def0" "#b2b2b2"])
  '(evil-want-Y-yank-to-eol nil)
  '(package-selected-packages
    (quote
-    (nord-theme dracula-theme eslintd-fix rvm ruby-tools ruby-test-mode ruby-refactor rubocop rspec-mode robe rbenv rake minitest chruby bundler inf-ruby web-mode unfill tagedit smeargle slim-mode scss-mode sass-mode pug-mode mwim mmm-mode markdown-toc markdown-mode magit-gitflow less-css-mode impatient-mode htmlize helm-gitignore helm-css-scss helm-company helm-c-yasnippet haml-mode gitignore-mode gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ git-gutter-fringe fringe-helper git-gutter+ git-gutter gh-md fuzzy flycheck-pos-tip pos-tip flycheck evil-magit magit magit-popup git-commit with-editor emmet-mode diff-hl company-web web-completion-data company-tern dash-functional company-statistics company browse-at-remote auto-yasnippet ac-ispell auto-complete yaml-mode web-beautify tern livid-mode skewer-mode simple-httpd json-mode json-snatcher json-reformat js2-refactor yasnippet multiple-cursors js2-mode js-doc coffee-mode ws-butler winum which-key volatile-highlights vi-tilde-fringe uuidgen use-package toc-org symon string-inflection spaceline restart-emacs request rainbow-delimiters popwin persp-mode pcre2el password-generator paradox org-plus-contrib org-bullets open-junk-file neotree move-text macrostep lorem-ipsum linum-relative link-hint info+ indent-guide hungry-delete hl-todo highlight-parentheses highlight-numbers highlight-indentation hide-comnt help-fns+ helm-themes helm-swoop helm-purpose helm-projectile helm-mode-manager helm-make helm-flx helm-descbinds helm-ag google-translate golden-ratio flx-ido fill-column-indicator fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-lisp-state evil-lion evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu eval-sexp-fu elisp-slime-nav editorconfig dumb-jump define-word column-enforce-mode clean-aindent-mode auto-highlight-symbol auto-compile aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line))))
+    (xterm-color ttl-mode toml-mode sparql-mode shell-pop racer psci purescript-mode psc-ide nginx-mode multi-term magit-gh-pulls intero insert-shebang hlint-refactor hindent helm-hoogle helm-dash haskell-snippets godoctor go-rename go-guru go-eldoc github-search github-clone gist gh marshal logito pcache ht flycheck-rust flycheck-haskell flycheck-elm flycheck-bashate fish-mode eshell-z eshell-prompt-extras esh-help elm-mode dash-at-point dante company-shell company-go go-mode company-ghci company-ghc ghc haskell-mode company-cabal cmm-mode cargo rust-mode rjsx-mode orgit org-projectile org-category-capture org-present org-pomodoro alert log4e gntp org-download org-brain gnuplot evil-org powerline spinner hydra parent-mode projectile pkg-info epl flx smartparens iedit anzu goto-chg undo-tree highlight diminish f s bind-map bind-key packed dash avy async popup tide typescript-mode helm helm-core evil window-purpose imenu-list nord-theme dracula-theme eslintd-fix rvm ruby-tools ruby-test-mode ruby-refactor rubocop rspec-mode robe rbenv rake minitest chruby bundler inf-ruby web-mode unfill tagedit smeargle slim-mode scss-mode sass-mode pug-mode mwim mmm-mode markdown-toc markdown-mode magit-gitflow less-css-mode impatient-mode htmlize helm-gitignore helm-css-scss helm-company helm-c-yasnippet haml-mode gitignore-mode gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ git-gutter-fringe fringe-helper git-gutter+ git-gutter gh-md fuzzy flycheck-pos-tip pos-tip flycheck evil-magit magit magit-popup git-commit with-editor emmet-mode diff-hl company-web web-completion-data company-tern dash-functional company-statistics company browse-at-remote auto-yasnippet ac-ispell auto-complete yaml-mode web-beautify tern livid-mode skewer-mode simple-httpd json-mode json-snatcher json-reformat js2-refactor yasnippet multiple-cursors js2-mode js-doc coffee-mode ws-butler winum which-key volatile-highlights vi-tilde-fringe uuidgen use-package toc-org symon string-inflection spaceline restart-emacs request rainbow-delimiters popwin persp-mode pcre2el password-generator paradox org-plus-contrib org-bullets open-junk-file neotree move-text macrostep lorem-ipsum linum-relative link-hint info+ indent-guide hungry-delete hl-todo highlight-parentheses highlight-numbers highlight-indentation hide-comnt help-fns+ helm-themes helm-swoop helm-purpose helm-projectile helm-mode-manager helm-make helm-flx helm-descbinds helm-ag google-translate golden-ratio flx-ido fill-column-indicator fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-lisp-state evil-lion evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu eval-sexp-fu elisp-slime-nav editorconfig dumb-jump define-word column-enforce-mode clean-aindent-mode auto-highlight-symbol auto-compile aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -429,3 +543,19 @@ This function is called at the very end of Spacemacs initialization."
  ;; If there is more than one, they won't work right.
  )
 )
+(custom-set-variables
+ ;; custom-set-variables was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(ansi-color-names-vector
+   ["#0a0814" "#f2241f" "#67b11d" "#b1951d" "#4f97d7" "#a31db1" "#28def0" "#b2b2b2"])
+ '(package-selected-packages
+   (quote
+    (xterm-color toml-mode shell-pop rjsx-mode racer psci purescript-mode psc-ide org-projectile org-category-capture org-present org-pomodoro alert log4e gntp org-download nginx-mode multi-term magit-gh-pulls intero insert-shebang htmlize hlint-refactor hindent helm-hoogle helm-dash haskell-snippets go-guru go-eldoc gnuplot github-search github-clone github-browse-file gist gh marshal logito pcache ht flycheck-rust seq flycheck-haskell flycheck-elm fish-mode eshell-z eshell-prompt-extras esh-help elm-mode dash-at-point company-shell company-go go-mode company-ghci company-ghc ghc haskell-mode company-cabal cmm-mode cargo rust-mode yaml-mode ws-butler winum which-key web-mode web-beautify volatile-highlights vi-tilde-fringe uuidgen use-package unfill toc-org tide typescript-mode tagedit spaceline powerline smeargle slim-mode scss-mode sass-mode rvm ruby-tools ruby-test-mode rubocop rspec-mode robe restart-emacs rbenv rake rainbow-delimiters pug-mode popwin persp-mode pcre2el paradox spinner orgit org-plus-contrib org-bullets open-junk-file neotree mwim move-text mmm-mode minitest markdown-toc markdown-mode magit-gitflow macrostep lorem-ipsum livid-mode skewer-mode simple-httpd linum-relative link-hint less-css-mode json-mode json-snatcher json-reformat js2-refactor multiple-cursors js2-mode js-doc info+ indent-guide hydra hungry-delete hl-todo highlight-parentheses highlight-numbers parent-mode highlight-indentation hide-comnt help-fns+ helm-themes helm-swoop helm-projectile helm-mode-manager helm-make projectile helm-gitignore request helm-flx helm-descbinds helm-css-scss helm-company helm-c-yasnippet helm-ag haml-mode google-translate golden-ratio gitignore-mode gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ git-gutter-fringe fringe-helper git-gutter+ git-gutter gh-md fuzzy flycheck-pos-tip pos-tip flycheck pkg-info epl flx-ido flx fill-column-indicator fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-magit magit magit-popup git-commit with-editor evil-lisp-state smartparens evil-indent-plus evil-iedit-state iedit evil-exchange evil-escape evil-ediff evil-args evil-anzu anzu evil goto-chg undo-tree eval-sexp-fu highlight emmet-mode elisp-slime-nav dumb-jump f diminish diff-hl define-word company-web web-completion-data company-tern s dash-functional tern company-statistics company column-enforce-mode coffee-mode clean-aindent-mode chruby bundler inf-ruby bind-map bind-key auto-yasnippet yasnippet auto-highlight-symbol auto-compile packed dash aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line helm avy helm-core async ac-ispell auto-complete popup nord-theme))))
+(custom-set-faces
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ )
